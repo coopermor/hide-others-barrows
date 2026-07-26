@@ -1,14 +1,14 @@
 package com.coopermor.hideothersbarrows;
 
-import com.google.inject.Provides;
+import java.util.Set;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.Subscribe;
+import net.runelite.api.NPC;
+import net.runelite.api.Renderable;
+import net.runelite.api.gameval.NpcID;
+import net.runelite.client.callback.RenderCallback;
+import net.runelite.client.callback.RenderCallbackManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
@@ -16,38 +16,49 @@ import net.runelite.client.plugins.PluginDescriptor;
 @PluginDescriptor(
 	name = "Hide Others Barrows"
 )
-public class HideOthersBarrowsPlugin extends Plugin
+public class HideOthersBarrowsPlugin extends Plugin implements RenderCallback
 {
 	@Inject
 	private Client client;
 
 	@Inject
-	private HideOthersBarrowsConfig config;
+	RenderCallbackManager renderCallbackManager;
+
+	private static final Set<Integer> BARROWS_BROTHERS = Set.of(
+		NpcID.BARROWS_AHRIM, NpcID.BARROWS_DHAROK,
+		NpcID.BARROWS_GUTHAN, NpcID.BARROWS_KARIL,
+		NpcID.BARROWS_TORAG, NpcID.BARROWS_VERAC
+	);
 
 	@Override
 	protected void startUp() throws Exception
 	{
-		log.debug("Hide Others Barrows started!");
+		renderCallbackManager.register(this);
 	}
 
 	@Override
 	protected void shutDown() throws Exception
 	{
-		log.debug("Hide Others Barrows stopped!");
+		renderCallbackManager.unregister(this);
 	}
 
-	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged)
+	@Override
+	public boolean addEntity(Renderable renderable, boolean ui)
 	{
-		if (gameStateChanged.getGameState() == GameState.LOGGED_IN)
+		if (!(renderable instanceof NPC))
 		{
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Hide Others Barrows says " + config.greeting(), null);
+			return true;
 		}
-	}
 
-	@Provides
-	HideOthersBarrowsConfig provideConfig(ConfigManager configManager)
-	{
-		return configManager.getConfig(HideOthersBarrowsConfig.class);
+		NPC npc = (NPC) renderable;
+
+		if (!BARROWS_BROTHERS.contains(npc.getId()))
+		{
+			return true;
+		}
+
+		NPC hintArrowNpc = client.getHintArrowNpc();
+
+		return hintArrowNpc != null && npc.getIndex() == hintArrowNpc.getIndex();
 	}
 }
